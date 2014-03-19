@@ -10,16 +10,16 @@
 
 (deffacts package-data
   ; Number | Depart City | Delivery City | Size | Order Arrival Time | Expected Delivery Time
-  (package 1 key-west jacksonville 1 2 15 )
-  (package 2 west-palm st-augustine 3 4 10 )
-  (package 3 gainesville tallahassee 4 5 10 )
-  (package 4 jacksonville orlando 2 8 18 )
-  (package 5 ft-myers key-west 6 9 20 )
-  (package 6 orlando lake-city 4 9 16 )
-  (package 7 west-palm miami 5 9 16 )
-  (package 8 miami ocala 4 10 20 )
-  (package 9 gainesville orlando 7 11 17 )
-  (package 10 tampa tallahassee 6 12 25 ))
+  (package 1 key-west jacksonville 1 2 15)
+  (package 2 west-palm st-augustine 3 4 10)
+  (package 3 gainesville tallahassee 4 5 10)
+  (package 4 jacksonville orlando 2 8 18)
+  (package 5 ft-myers key-west 6 9 20)
+  (package 6 orlando lake-city 4 9 16)
+  (package 7 west-palm miami 5 9 16)
+  (package 8 miami ocala 4 10 20)
+  (package 9 gainesville orlando 7 11 17)
+  (package 10 tampa tallahassee 6 12 25))
 
 (deffacts city-travel-time
   (travel-time orlando ocala 1)
@@ -47,23 +47,57 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Rules
 
+(defrule update-time
+  (declare (salience -10))
+  ?current-time <- (current-time ?time)
+  ?old-time <- (old-time ?)
+  =>
+  (retract ?current-time)
+  (retract ?old-time)
+
+  (assert (current-time (inc ?time)))
+  (assert (old-time ?time)))
+
+
+(defrule to-route-trucks
+  (truck ? ?location $? idle none ?)
+  (package ? ?package-location $?)
+  (not (travel-time ?location $? ?package-location ?))
+  =>
+  (assert (to-route ?location ?package-location)))
+
+(defrule to-route-packages
+  (package ? ?start-city ?end-city $?)
+  (not (travel-time ?start-city $? ?end-city ?))
+  =>
+  (assert (to-route ?start-city ?end-city)))
+
+(defrule to-route-home
+  (package ? ? ?end-city $?)
+  (not (travel-time ?end-city $? orlando ?))
+  =>
+  (assert (to-route ?end-city orlando)))
+
 (defrule build-travel-time-graph
   (declare (salience 100))
-  (travel-time ?middle-city $?interpaths2 ?other-city ?time2)
+  (to-route ?start-city ?other-city)
   (travel-time ?start-city $?interpaths1 ?middle-city ?time1)
+  (travel-time ?middle-city $?interpaths2 ?other-city ?time2)
 
-  (neq ?start-city ?other-city)
-  (neq ?middle-city ?other-city)
-  (neq ?middle-city ?start-city)
+  (not (travel-time ?start-city $? ?other-city ?time3&:(<= ?time3 (+ ?time1 ?time2))))
 
-  (not (test (member$ ?start-city $?interpaths1)))
-  (not (test (member$ ?start-city $?interpaths2)))
+  ;(neq ?start-city ?other-city)
+  ;(neq ?middle-city ?other-city)
+  ;(neq ?middle-city ?start-city)
 
-  (not (test (member$ ?middle-city $?interpaths1)))
-  (not (test (member$ ?middle-city $?interpaths2)))
+  ;(not (test (member$ ?start-city $?interpaths1)))
+  ;(not (test (member$ ?start-city $?interpaths2)))
 
-  (not (test (member$ ?other-city $?interpaths1)))
-  (not (test (member$ ?other-city $?interpaths2)))
+  ;(not (test (member$ ?middle-city $?interpaths1)))
+  ;(not (test (member$ ?middle-city $?interpaths2)))
+
+  ;(not (test (member$ ?other-city $?interpaths1)))
+  ;(not (test (member$ ?other-city $?interpaths2)))
   =>
   (assert
    (travel-time ?start-city $?interpaths1 ?middle-city $?interpaths2 ?other-city (+ ?time1 ?time2))))
@@ -74,6 +108,13 @@
   (not (travel-time ?end-city ?start-city ?))
   =>
   (assert (travel-time ?end-city ?start-city ?time)))
+
+(defrule identity-property-of-travel
+  (declare (salience 110))
+  (travel-time ?city $?)
+  (not (travel-time ?city ?city 0))
+  =>
+  (assert (travel-time ?city ?city 0)))
 
 (defrule set-initial-fast-paths
   (travel-time ?start-city $?interpaths ?final-city ?time)
@@ -130,34 +171,49 @@
 
   =>
   (retract ?pickup-truck)
+  (printout t "Delivering " ?package-number " with " ?number " to " ?final-dest crlf)
   (assert
    (truck ?number ?pack-loc ?final-dest ?space-avail
           delivering ?package-number (+ ?delivery-time ?current-time)))
   )
 
-(defrule update-time
-  (declare (salience -10))
-  ?current-time <- (current-time ?time)
-  ?old-time <- (old-time ?)
-  =>
-  (retract ?current-time)
-  (retract ?old-time)
-
-  (assert (current-time (inc ?time)))
-  (assert (old-time ?time)))
-
-(defrule tick-trucks
+(defrule deliver-package
   (current-time ?current-time)
-  ?truck <- (truck ?number ?current-location ?dest ?space-avail ~?current-time ?action ?package ?eta)
+  ?truck <- (truck ?number ? ?dest ?space-avail delivering ?package-number ?eta)
+  (package ?package-number ? ? ?package-size $?)
+
+  (test (= ?current-time ?eta))
+
+  ;; Go back home
+  (fastest-path ?dest $? orlando ?time)
+
   =>
+  (retract ?truck)
+  (printout t "Delivered " ?package-number " with " ?number ", going home now" crlf)
+  (assert
+   (truck ?number ?dest orlando (+ ?space-avail ?package-size) returning none (+ ?time ?current-time)))
 
   )
+
+(defrule arrive-home
+  (current-time ?current-time)
+  ?truck <- (truck ?number ? ?dest ?space-avail returning none ?eta)
+
+  (test (= ?current-time ?eta))
+
+  =>
+  (retract ?truck)
+  (printout t "Truck " ?number " has returned home " crlf)
+  (assert
+   (truck ?number ?dest none ?space-avail idle none ?current-time)))
+
 
 
 (run 1)
 (run 20)
 (facts)
 
+(watch facts)
 (watch rules)
 (reset)
 
@@ -198,5 +254,4 @@
 ;;   (retract ?lowest)
 ;;   (assert (lowest-foo ?a)))
 
-;; (run 1)
 ;; (facts)
