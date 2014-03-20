@@ -86,18 +86,6 @@
 
   (not (travel-time ?start-city $? ?other-city ?time3&:(<= ?time3 (+ ?time1 ?time2))))
 
-  ;(neq ?start-city ?other-city)
-  ;(neq ?middle-city ?other-city)
-  ;(neq ?middle-city ?start-city)
-
-  ;(not (test (member$ ?start-city $?interpaths1)))
-  ;(not (test (member$ ?start-city $?interpaths2)))
-
-  ;(not (test (member$ ?middle-city $?interpaths1)))
-  ;(not (test (member$ ?middle-city $?interpaths2)))
-
-  ;(not (test (member$ ?other-city $?interpaths1)))
-  ;(not (test (member$ ?other-city $?interpaths2)))
   =>
   (assert
    (travel-time ?start-city $?interpaths1 ?middle-city $?interpaths2 ?other-city (+ ?time1 ?time2))))
@@ -215,6 +203,7 @@
 
 (watch facts)
 (watch rules)
+(unwatch rules)
 (reset)
 
 (agenda)
