@@ -53,7 +53,6 @@
   (retract ?current-time)
   (assert (current-time (inc ?time))))
 
-
 (defrule to-route-trucks
   (truck ? ?location $? idle none ?)
   (package ? ?package-location $?)
@@ -209,20 +208,21 @@
 
 
 
-(run 1)
-(run 20)
-(facts)
+;; (run 1)
+;; (run 5)
+;; (run 20)
+;; (facts)
 
-(watch facts)
-(watch rules)
-(unwatch rules)
-(reset)
+;; (watch facts)
+;; (watch rules)
+;; (unwatch rules)
+;; (reset)
 
-(agenda)
+;; (agenda)
 
-(matches find-fastest-path)
+;; (matches find-fastest-path)
 
-(matches build-travel-time-graph)
+;; (matches build-travel-time-graph)
 
 
 ;; (assert
