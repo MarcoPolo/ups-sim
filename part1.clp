@@ -140,6 +140,11 @@
   (fastest-path ?current-location $? ?package-location ?eta)
 
   =>
+  ;; Log result
+  (assert
+   (result ?current-time (str-cat "for " ?package-number)
+           ?number dispatched ?package-location ?eta))
+
   (retract ?available-truck)
   (assert (truck ?number ?current-location ?package-location
                  (- ?space-avail ?package-size)
@@ -158,6 +163,12 @@
   (fastest-path ?pack-loc $? ?final-dest ?delivery-time)
 
   =>
+  ;; Log result
+  (assert
+   (result ?current-time ?package-number
+           ?number delivering ?final-dest ?eta))
+
+
   (retract ?pickup-truck)
   (printout t "Delivering " ?package-number " with " ?number " to " ?final-dest crlf)
   (assert
@@ -176,6 +187,11 @@
   (fastest-path ?dest $? orlando ?time)
 
   =>
+  ;; Log result
+  (assert
+   (result ?current-time none
+           ?number return orlando ?eta))
+
   (retract ?truck)
   (printout t "Delivered " ?package-number " with " ?number ", going home now" crlf)
   (assert
