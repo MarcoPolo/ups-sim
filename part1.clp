@@ -36,7 +36,6 @@
   (travel-time lake-city tallahassee 2))
 
 (deffacts time
-  (old-time 0)
   (current-time 0))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -50,13 +49,9 @@
 (defrule update-time
   (declare (salience -10))
   ?current-time <- (current-time ?time)
-  ?old-time <- (old-time ?)
   =>
   (retract ?current-time)
-  (retract ?old-time)
-
-  (assert (current-time (inc ?time)))
-  (assert (old-time ?time)))
+  (assert (current-time (inc ?time))))
 
 
 (defrule to-route-trucks
@@ -179,7 +174,7 @@
 (defrule deliver-package
   (current-time ?current-time)
   ?truck <- (truck ?number ? ?dest ?space-avail delivering ?package-number ?eta)
-  (package ?package-number ? ? ?package-size $?)
+  ?package <- (package ?package-number ? ? ?package-size $?)
 
   (test (= ?current-time ?eta))
 
@@ -193,6 +188,7 @@
            ?number return orlando ?eta))
 
   (retract ?truck)
+  (retract ?package)
   (printout t "Delivered " ?package-number " with " ?number ", going home now" crlf)
   (assert
    (truck ?number ?dest orlando (+ ?space-avail ?package-size) returning none (+ ?time ?current-time)))
