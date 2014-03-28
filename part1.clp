@@ -19,6 +19,23 @@
   (slot expected-delivery-time)
   (slot actual-delivery-time))
 
+(deftemplate aggr-truck-report
+  (slot number)
+  (slot delivering-percent-of-busy-time)
+  (slot non-delivery-time)
+  (slot average-used-space)
+  (slot packages-delivered)
+  (slot busy-percent)
+  (slot busy)
+  (slot idle))
+
+(deftemplate aggr-package-report
+  (slot number)
+  (slot wait-time)
+  (slot pickup-time)
+  (slot delivery-time)
+  (slot lateness-time))
+
 (deftemplate package-avg-report
   (slot avg-wait)
   (slot num-packages-on-time)
@@ -116,6 +133,35 @@
   (fact-slot-value
    (first (find-fact ((?p ?fact-name)) (= ?number ?p:number)))
    ?slot))
+
+(deffunction map (?fn ?lst)
+  (bind ?output-lst (create$))
+
+  (foreach ?item ?lst
+           (bind ?output-lst (create$ ?output-lst (funcall ?fn ?item))))
+  ?output-lst)
+
+(deffunction sort-by-number-asc (?a ?b)
+  (> (fact-slot-value ?a number) (fact-slot-value ?b number)))
+
+(deffunction save-package-report (?package-fact)
+  (format save-file "%d,%d,%d,%d,%d%n"
+          (fact-slot-value ?package-fact number)
+          (fact-slot-value ?package-fact wait-time)
+          (fact-slot-value ?package-fact pickup-time)
+          (fact-slot-value ?package-fact delivery-time)
+          (fact-slot-value ?package-fact lateness-time)))
+
+(deffunction save-truck-report (?truck-fact)
+  (format save-file "%d,%.2f,%d,%d,%d,%.2f,%d,%d%n"
+          (fact-slot-value ?truck-fact number)
+          (fact-slot-value ?truck-fact delivering-percent-of-busy-time)
+          (fact-slot-value ?truck-fact non-delivery-time)
+          (fact-slot-value ?truck-fact average-used-space)
+          (fact-slot-value ?truck-fact packages-delivered)
+          (fact-slot-value ?truck-fact busy-percent)
+          (fact-slot-value ?truck-fact busy)
+          (fact-slot-value ?truck-fact idle)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -281,7 +327,7 @@
 
 
   (retract ?pickup-truck)
-  (printout t "Delivering " ?package-number " with " ?number " to " ?final-dest crlf)
+  ;(printout t "Delivering " ?package-number " with " ?number " to " ?final-dest crlf)
   (assert
    (truck ?number ?pack-loc ?final-dest ?space-avail
           delivering ?package-number ?new-eta))
@@ -327,7 +373,7 @@
                              (actual-delivery-time ?current-time)))
 
 
-  (printout t "Delivered " ?package-number " with " ?number ", going home now" crlf)
+  ;(printout t "Delivered " ?package-number " with " ?number ", going home now" crlf)
   (assert
    (truck ?number ?dest orlando (+ ?space-avail ?package-size) returning none ?new-eta))
 
@@ -341,7 +387,7 @@
 
   =>
   (retract ?truck)
-  (printout t "Truck " ?number " has returned home " crlf)
+  ;(printout t "Truck " ?number " has returned home " crlf)
 
   ;; Log result
   (assert
@@ -386,7 +432,7 @@
   ?p <- (package $?attrs)
   (not (facts-like-printed package $?attrs))
   =>
-  (printout t crlf "Package: " $?attrs crlf crlf)
+  ;(printout t crlf "Package: " $?attrs crlf crlf)
   (assert (facts-like-printed package $?attrs)))
 
 
@@ -420,13 +466,13 @@
   (bind ?idle-time (nth$ 1 ?time-diff-info))
   (bind ?last-idle-time (nth$ 2 ?time-diff-info))
 
-  (printout t "normal idle " ?idle-time crlf)
-  (printout t "last idle " ?last-idle-time crlf)
+  ;(printout t "normal idle " ?idle-time crlf)
+  ;(printout t "last idle " ?last-idle-time crlf)
 
   ;; Take into account waiting for the last truck to arrive
   (bind ?idle-time (+ ?idle-time (- ?last-truck-to-arrive-time ?last-idle-time)))
 
-  (printout t "last truck: " ?last-truck-to-arrive-time crlf)
+  ;(printout t "last truck: " ?last-truck-to-arrive-time crlf)
 
   ;; Save the data
   (assert (truck-report-results idle ?truck-number ?idle-time)))
@@ -514,6 +560,31 @@
                          (/ (- ?busy-time ?non-delivery-time)
                             ?busy-time))))
 
+(defrule compile-truck-report
+  (truck ?number $?)
+  (truck-report-results delivering-percent-of-busy-time ?number ?delivery-percent-of-busy-time)
+  (truck-report-results non-delivery-time ?number ?non-delivery-time)
+  (truck-report-results average-used-space ?number ?avg-used-space)
+  (truck-report-results packages-delivered ?number ?packages-delivered)
+  (truck-report-results busy-percent ?number ?busy-percent)
+  (truck-report-results busy ?number ?busy-time)
+  (truck-report-results idle ?number ?idle-time)
+
+  (not (aggr-truck-report (number ?number)))
+  =>
+
+  (assert
+   (aggr-truck-report
+    (number ?number)
+    (delivering-percent-of-busy-time ?delivery-percent-of-busy-time)
+    (non-delivery-time ?non-delivery-time)
+    (average-used-space ?avg-used-space)
+    (packages-delivered ?packages-delivered)
+    (busy-percent ?busy-percent)
+    (busy ?busy-time)
+    (idle ?idle-time))))
+
+
 (defrule make-package-reports
   (simulation complete)
   =>
@@ -555,6 +626,25 @@
 
   (assert (package-report-result lateness-time ?number ?lateness-time)))
 
+(defrule compile-package-reports
+
+  (delivered-package (number ?number))
+  (package-report-result wait-time ?number ?wait-time)
+  (package-report-result delivery-time ?number ?delivery-time)
+  (package-report-result pickup-time ?number ?pickup-time)
+  (package-report-result lateness-time ?number ?lateness-time)
+
+  (not (aggr-package-report (number ?number)))
+
+  =>
+
+  (assert
+   (aggr-package-report
+    (number ?number)
+    (wait-time ?wait-time)
+    (pickup-time ?pickup-time)
+    (delivery-time ?delivery-time)
+    (lateness-time ?lateness-time))))
 
 (defrule make-package-avg-reports
   (simulation complete)
@@ -614,67 +704,80 @@
            (num-packages-on-time ?num-packages-on-time)
            (num-packages-late ?num-packages-late))))
 
+(defrule printout-avg-report
+  ?report <- (package-avg-report
+   (avg-wait ?avg-wait)
+   (avg-lateness-for-packages ?avg-lateness-for-all-packages)
+   (avg-lateness-for-late-packages ?avg-lateness-for-late-packages)
+   (num-packages-on-time ?num-packages-on-time)
+   (num-packages-late ?num-packages-late))
+  =>
+  (ppfact ?report)
+  (open "/tmp/package-avg.csv" save-file "w")
+  (format save-file
+          "avg-wait,avg-lateness-for-packages,avg-lateness-for-late-packages,num-packages-on-time,num-packages-late,%n")
+  (format save-file "%d,%.2f,%.2f,%d,%d%n"
+          ?avg-wait ?avg-lateness-for-all-packages ?avg-lateness-for-late-packages
+          ?num-packages-on-time ?num-packages-late)
+  (close save-file))
+
+(defrule printout-truck-reports
+
+  (forall
+   (truck ?truck-number $?)
+   (aggr-truck-report (number ?truck-number)))
+
+  =>
+
+  (bind ?trucks (sort sort-by-number-asc (find-all-facts ((?t aggr-truck-report)) TRUE)))
+
+  (printout t "Truck Reports: " crlf)
+  (map ppfact ?trucks)
+  (printout t "End Truck Reports" crlf crlf)
+
+  (open "/tmp/trucks.csv" save-file "w")
+  (printout save-file
+            "number,delivering-percent-of-busy-time,non-delivery-time,average-used-space,packages-delivered,busy-percent,busy,idle"
+            crlf)
+  (map save-truck-report ?trucks)
+  (close save-file))
+
+(defrule printout-package-reports
+  (forall
+   (delivered-package (number ?package-number))
+   (aggr-package-report (number ?package-number)))
+
+  =>
+
+  (printout t "Package Reports: " crlf)
+  (bind ?packages
+        (sort sort-by-number-asc (find-all-facts ((?t aggr-package-report)) TRUE)))
+  (map ppfact ?packages)
 
 
-;; (foreach ?f (find-all-facts ((?t truck)) TRUE)
-;;           (ppfact ?f))
+  (printout t "End Package Reports" crlf crlf)
 
+  (open "/tmp/packages.csv" save-file "w")
+  (printout save-file "number,wait-time,pickup-time,delivery-time,lateness-time" crlf)
+  (map save-package-report ?packages)
+  (close save-file))
 
-
-;  (slot time)
-;  (slot package-number)
-;  (slot truck-number)
-;  (slot action)
-;  (slot arrival-location)
-;  (slot arrival-time)
-
-
-(do-for-all-facts ((?t truck-report-results)) TRUE (retract ?t))
-(do-for-all-facts ((?t truck-report)) TRUE (retract ?t))
-(print-results)
-
-;; (find-all-facts ((?r result)) (and (= 2 ?r:truck-number) (eq ?r:action returning)))
-
-;(bind ?k (nth$ 1 (find-fact ((?r result)) TRUE)))
-
-;; (do-for-all-facts ((?t simulation)) TRUE (retract ?t))
-;; (assert (simulation complete))
-
-(do-for-all-facts ((?p package-report-result)) TRUE (ppfact ?p))
-
-; 3 -> 2 -> 10 -> 5
-;      3    6     6
-
-;(get-slot-of-with-number delivered-package 5 size)
-(do-for-all-facts ((?t truck-report-results)) (ppfact ?t))
-
-(do-for-fact ((?p package-report-result))
-             (and (eq lateness-time (first ?p:implied))
-                  (= 4 (nth$ 2 ?p:implied)))
-             (printout t (nth$ 3 ?p:implied) crlf))
-
-;(find-fact (result $?))
-
-;(printout t "foo " crlf)
-
-;(assert (facts-like package))
-;(retract (facts-like package))
 
 ;(clear)
 ;(load "part1.clp")
-(run 1)
-(run 5)
-(run 20)
-(run 40)
-(run 100)
-(run 300)
-(run 390)
-(run 500)
-(reset)
-(run)
+;; (run 1)
+;; (run 5)
+;; (run 20)
+;; (run 40)
+;; (run 100)
+;; (run 300)
+;; (run 390)
+;; (run 500)
+;; (reset)
+;; (run)
 ;(facts)
 
-(matches make-package-avg-reports)
+;(matches printout-truck-reports)
 
 ;; (agenda)
 ;; (matches print-finished)
@@ -684,42 +787,3 @@
 ;; (watch rules)
 ;; (unwatch rules)
 ;(reset)
-
-;; (agenda)
-
-;; (matches find-fastest-path)
-
-;; (matches build-travel-time-graph)
-
-
-;; (assert
-;;  (foo 3)
-;;  (foo 4)
-;;  (foo 6)
-;;  (foo 9)
-;;  (foo 2)
-;;  (foo 5)
-;;  )
-
-;; (defrule lowest
-;;   (foo ?a)
-;;   (foo ?b)
-;;   (test (< ?a ?b))
-;;   (not (foo ?c&:(< ?c ?a)))
-;;   (not (lowest-foo ?))
-;;   =>
-;;   (bind ?asdf (lowest-foo ?))
-;;   (assert (lowest-foo ?a)))
-
-
-;; (defrule update-lowest
-;;   ?foo <- (foo ?a)
-;;   (not (foo ?c&:(< ?c ?a)))
-
-;;   ?lowest <- (lowest-foo ?b)
-;;   (test (< ?a ?b))
-;;   =>
-;;   (retract ?lowest)
-;;   (assert (lowest-foo ?a)))
-
-;; (facts)
