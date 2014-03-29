@@ -48,23 +48,36 @@
 
 (deffacts trucks
  ; Number | Current Location | Destination | Space Avail | current time | action | package | eta: the expected time to arrival
- (truck 1 orlando none 10 idle none 0)
- (truck 2 orlando none 10 idle none 0)
- (truck 3 orlando none 8 idle none 0)
- (truck 4 orlando none 7 idle none 0))
+  (truck 1 orlando none 10 idle none 0)
+  (truck 2 orlando none 8 idle none 0)
+  (truck 3 orlando none 6 idle none 0)
+  (truck 4 orlando none 10 idle none 0)
+  (truck 5 orlando none 12 idle none 0)
+  (truck 6 orlando none 6 idle none 0))
 
 (deffacts package-data
   ; Number | Depart City | Delivery City | Size | Order Arrival Time | Expected Delivery Time
-  (package 1 key-west jacksonville 1 2 15)
-  (package 2 west-palm st-augustine 3 4 10)
-  (package 3 gainesville tallahassee 4 5 10)
-  (package 4 jacksonville orlando 2 8 18)
-  (package 5 ft-myers key-west 6 9 20)
-  (package 6 orlando lake-city 4 9 16)
-  (package 7 west-palm miami 5 9 16)
-  (package 8 miami ocala 4 10 20)
-  (package 9 gainesville orlando 7 11 17)
-  (package 10 tampa tallahassee 6 12 25))
+  (package 1 orlando jacksonville 4 1 15)
+  (package 2 tampa st-augustine 4 4 10)
+  (package 3 key-west miami 3 8 25)
+  (package 4 miami orlando 5 20 30)
+  (package 5 ocala orlando 7 30 40)
+  (package 6 orlando lake-city 6 40 45)
+  (package 7 jacksonville tallahassee 8 65 80)
+  (package 8 tallahassee gainesville 4 80 100)
+  (package 9 st-augustine tallahassee 5 90 110)
+  (package 10 west-palm ft-myers 1 110 120)
+  (package 11 ocala ft-myers 1 110 120)
+  (package 12 jacksonville key-west 2 120 150)
+  (package 13 miami ocala 2 150 155)
+  (package 14 miami gainesville 5 150 160)
+  (package 15 miami tallahassee 2 150 170)
+  (package 16 tallahassee lake-city 2 200 210)
+  (package 17 lake-city tallahassee 7 220 240)
+  (package 18 tallahassee key-west 9 240 300)
+  (package 19 st-augustine gainesville 8 250 260)
+  (package 20 tampa jacksonville 1 250 270))
+
 
 (deffacts city-travel-time
   (travel-time orlando ocala 1)
@@ -535,9 +548,14 @@
                               ?r:package-number
                               size))))
 
+  (if (= 0 ?trips-count)
+    then
+    (bind ?avg-used 0)
+    else
+    (bind ?avg-used (/ ?space-used-in-trips (* ?trips-count ?truck-size))))
+
   (assert
-   (truck-report-results average-used-space ?truck-number (/ ?space-used-in-trips
-                                                             (* ?trips-count ?truck-size)))))
+   (truck-report-results average-used-space ?truck-number ?avg-used)))
 
 (defrule non-delivery-time-report
   ?report <- (truck-report non-delivery-time ?truck-number)
@@ -555,10 +573,15 @@
   (truck-report-results non-delivery-time ?truck-number ?non-delivery-time)
   (truck-report-results busy ?truck-number ?busy-time)
   =>
-  (assert
-   (truck-report-results delivering-percent-of-busy-time ?truck-number
-                         (/ (- ?busy-time ?non-delivery-time)
-                            ?busy-time))))
+  (if (= 0 ?busy-time)
+    then
+    (assert
+     (truck-report-results delivering-percent-of-busy-time ?truck-number 0))
+    else
+    (assert
+     (truck-report-results delivering-percent-of-busy-time ?truck-number
+                           (/ (- ?busy-time ?non-delivery-time)
+                              ?busy-time)))))
 
 (defrule compile-truck-report
   (truck ?number $?)
@@ -786,4 +809,5 @@
 ;(unwatch facts)
 ;; (watch rules)
 ;; (unwatch rules)
-;(reset)
+(reset)
+(run)
