@@ -787,7 +787,6 @@
 
 
 ;(clear)
-;(load "part1.clp")
 ;; (run 1)
 ;; (run 5)
 ;; (run 20)
@@ -797,10 +796,8 @@
 ;; (run 390)
 ;; (run 500)
 ;; (reset)
-;; (run)
-;(facts)
 
-;(matches printout-truck-reports)
+;(MATCHES PRINTOUT-TRUCK-reports)
 
 ;; (agenda)
 ;; (matches print-finished)
@@ -809,5 +806,8 @@
 ;(unwatch facts)
 ;; (watch rules)
 ;; (unwatch rules)
-(reset)
-(run)
+
+;(load "part1.clp")
+;(reset)
+;(run)
+
